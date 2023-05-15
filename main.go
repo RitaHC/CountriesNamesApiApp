@@ -1,3 +1,5 @@
+
+
 package main
 
 import (
@@ -14,7 +16,28 @@ type Country struct {
 }
 
 func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	// Define a user map with usernames and passwords
+	users := map[string]string{
+		"admin": "password",
+	}
+
+	// Define a middleware that checks for a valid username and password
+	authMiddleware := func(handler http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			username, password, ok := r.BasicAuth()
+
+			if !ok || users[username] != password {
+				w.Header().Set("WWW-Authenticate", `Basic realm="Please enter your username and password"`)
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte("401 - Unauthorized"))
+				return
+			}
+
+			handler(w, r)
+		}
+	}
+
+	http.HandleFunc("/", authMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
 			url := "https://restcountries.com/v3.1/all"
 
@@ -38,9 +61,8 @@ func main() {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			w.Write([]byte("405 - Method Not Allowed"))
 		}
-	})
+	}))
 
 	log.Println("Listening on :8000...")
 	log.Fatal(http.ListenAndServe(":8000", nil))
 }
-
