@@ -1,5 +1,3 @@
-
-
 package main
 
 import (
@@ -13,7 +11,10 @@ type Country struct {
 		Common   string `json:"common"`
 		Official string `json:"official"`
 	} `json:"name"`
+	ID int `json:"id"`
 }
+
+var countries []Country
 
 func main() {
 	// Define a user map with usernames and passwords
@@ -37,24 +38,29 @@ func main() {
 		}
 	}
 
-	http.HandleFunc("/", authMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	// Create a new country
+	http.HandleFunc("/countries", authMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			var country Country
+			err := json.NewDecoder(r.Body).Decode(&country)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			country.ID = len(countries) + 1
+			countries = append(countries, country)
+
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte("Country created successfully"))
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte("405 - Method Not Allowed"))
+		}
+	}))
+
+	// Read all countries
+	http.HandleFunc("/countries", authMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
-			url := "https://restcountries.com/v3.1/all"
-
-			response, err := http.Get(url)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			defer response.Body.Close()
-
-			var countries []Country
-
-			err = json.NewDecoder(response.Body).Decode(&countries)
-			if err != nil {
-				log.Fatal(err)
-			}
-
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(countries)
 		} else {
@@ -63,6 +69,57 @@ func main() {
 		}
 	}))
 
-	log.Println("Listening on :8000...")
-	log.Fatal(http.ListenAndServe(":8000", nil))
+	// Update an existing country
+	http.HandleFunc("/countries/{country_id}", authMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "PUT" {
+			countryID := r.URL.Path[len("/countries/"):]
+
+			var country Country
+			err := json.NewDecoder(r.Body).Decode(&country)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			for i, c := range countries {
+				if c.ID == int(countryID) {
+					countries[i] = country
+					break
+				}
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("Country updated successfully"))
+		} else {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte("405 - Method Not Allowed"))
+		}
+	}))
+
+	// Delete an existing country
+	http.HandleFunc("/countries/{country_id}", authMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "DELETE" {
+			countryID := r.URL.Path[len("/countries/"):]
+
+			for i, c := range countries {
+				if c.ID == int(countryID) {
+					countries = append(countries)
+				}
+			}
+		}
+	}))
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+				
